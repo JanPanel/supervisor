@@ -40,8 +40,10 @@ async fn get_user(pool: Data<DbPool>, Path(id): Path<Uuid>) -> impl Responder {
 }
 
 #[post("/users")]
-async fn create_user(data: Json<User>) -> impl Responder {
+async fn create_user(pool: Data<DbPool>, data: Json<User>) -> impl Responder {
+    let conn = pool.get().unwrap();
     // TODO: Check if user already exists
+    // TODO: Hash password with argon2id
     let user = User {
         id: Uuid::new_v4(),
         email: data.0.email,
@@ -49,7 +51,11 @@ async fn create_user(data: Json<User>) -> impl Responder {
         permissions: data.0.permissions,
     };
 
-    // TODO: Save user to db
+    diesel::insert_into(users::table)
+        .values(&user)
+        .execute(&conn)
+        .unwrap();
+
     Json(user)
 }
 
