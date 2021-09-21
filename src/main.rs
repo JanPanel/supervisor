@@ -1,7 +1,8 @@
 use actix_web::{
+    get,
     middleware::Logger,
     post,
-    web::{Json, JsonConfig},
+    web::{Data, Json, JsonConfig, Path},
     App, HttpServer, Responder,
 };
 use diesel::{
@@ -9,12 +10,34 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
 };
 use dotenv::dotenv;
-use supervisor::models::User;
 use std::{env, error::Error};
+use supervisor::{models::User, schema::users};
 use uuid::Uuid;
 
 type DbPool = Pool<ConnectionManager<PgConnection>>;
 
+// TODO: Move all routes into modules and routers
+
+// NOTE: This service is only for testing purposes
+#[get("/users")]
+async fn get_users(pool: Data<DbPool>) -> impl Responder {
+    let conn = pool.get().unwrap();
+    let users = users::table.load::<User>(&conn).unwrap();
+
+    Json(users)
+}
+
+#[get("/users/{id}")]
+async fn get_user(pool: Data<DbPool>, Path(id): Path<Uuid>) -> impl Responder {
+    let conn = pool.get().unwrap();
+    let user = users::table
+        .filter(users::id.eq(id))
+        .load::<User>(&conn)
+        .unwrap();
+
+    // TODO: Return code 404 when user not found
+    Json(user)
+}
 
 #[post("/users")]
 async fn create_user(data: Json<User>) -> impl Responder {
@@ -47,6 +70,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .wrap(Logger::default())
             .data(JsonConfig::default().limit(4096))
             .data(pool.clone())
+            .service(get_user)
+            .service(get_users)
             .service(create_user)
     })
     .bind(&bind_url)?
