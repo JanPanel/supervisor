@@ -1,12 +1,24 @@
-use actix_web::{post, web::{Json, JsonConfig}, HttpServer, App, middleware::Logger, Responder};
-use supervisor::{User, NewUser};
+use actix_web::{
+    middleware::Logger,
+    post,
+    web::{Json, JsonConfig},
+    App, HttpServer, Responder,
+};
+use supervisor::models::User;
+use uuid::Uuid;
+
 
 
 #[post("/users")]
-async fn create_user(data: Json<NewUser>) -> impl Responder {
-    println!("{:?}", data.0);
+async fn create_user(data: Json<User>) -> impl Responder {
     // TODO: Check if user already exists
-    let user = User::new(data.0.email, data.0.password, data.0.permissions);
+    let user = User {
+        id: Uuid::new_v4(),
+        email: data.0.email,
+        password: data.0.password,
+        permissions: data.0.permissions,
+    };
+
     // TODO: Save user to db
     Json(user)
 }
