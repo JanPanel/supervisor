@@ -4,7 +4,9 @@ use actix_web::{
     web::{Json, JsonConfig},
     App, HttpServer, Responder,
 };
+use dotenv::dotenv;
 use supervisor::models::User;
+use std::{env, error::Error};
 use uuid::Uuid;
 
 
@@ -24,9 +26,12 @@ async fn create_user(data: Json<User>) -> impl Responder {
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<(), Box<dyn Error>> {
+    dotenv().ok();
     std::env::set_var("RUST_LOG", "actix_web=debug");
     env_logger::init();
+
+    let bind_url = format!("{}:{}", env::var("HOST")?, env::var("PORT")?);
 
     HttpServer::new(|| {
         App::new()
@@ -34,8 +39,9 @@ async fn main() -> std::io::Result<()> {
             .data(JsonConfig::default().limit(4096))
             .service(create_user)
     })
-        .bind("localhost:8080")?
-        // TODO: Extract server address to .env
-        .run()
-        .await
+    .bind(&bind_url)?
+    .run()
+    .await?;
+
+    Ok(())
 }
