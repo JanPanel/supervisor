@@ -4,11 +4,16 @@ use actix_web::{
     web::{Json, JsonConfig},
     App, HttpServer, Responder,
 };
+use diesel::{
+    prelude::*,
+    r2d2::{ConnectionManager, Pool},
+};
 use dotenv::dotenv;
 use supervisor::models::User;
 use std::{env, error::Error};
 use uuid::Uuid;
 
+type DbPool = Pool<ConnectionManager<PgConnection>>;
 
 
 #[post("/users")]
@@ -31,12 +36,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     std::env::set_var("RUST_LOG", "actix_web=debug");
     env_logger::init();
 
+    let database_url = env::var("DATABASE_URL")?;
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pool = Pool::builder().build(manager)?;
+
     let bind_url = format!("{}:{}", env::var("HOST")?, env::var("PORT")?);
 
-    HttpServer::new(|| {
+    HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
             .data(JsonConfig::default().limit(4096))
+            .data(pool.clone())
             .service(create_user)
     })
     .bind(&bind_url)?
