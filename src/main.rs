@@ -5,6 +5,10 @@ use actix_web::{
     web::{Data, Json, JsonConfig, Path},
     App, HttpServer, Responder,
 };
+use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
+    Argon2, PasswordHasher,
+};
 use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, Pool},
@@ -43,11 +47,17 @@ async fn get_user(pool: Data<DbPool>, Path(id): Path<Uuid>) -> impl Responder {
 async fn create_user(pool: Data<DbPool>, data: Json<User>) -> impl Responder {
     let conn = pool.get().unwrap();
     // TODO: Check if user already exists
-    // TODO: Hash password with argon2id
+
+    let salt = SaltString::generate(&mut OsRng);
+    let password_hash = Argon2::default()
+        .hash_password(data.password.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
+
     let user = User {
         id: Uuid::new_v4(),
         email: data.0.email,
-        password: data.0.password,
+        password: password_hash,
         permissions: data.0.permissions,
     };
 
@@ -58,6 +68,10 @@ async fn create_user(pool: Data<DbPool>, data: Json<User>) -> impl Responder {
 
     Json(user)
 }
+
+// TODO: A way to obtain an access token
+
+// TODO: Protected PATCH /users endpoint
 
 #[actix_web::main]
 async fn main() -> Result<(), Box<dyn Error>> {
